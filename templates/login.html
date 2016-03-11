@@ -1,0 +1,51 @@
+<html>
+<head>
+	<script src="//ajax.googleapis.com/ajax/libs/jquery/1.8.2/jquery.min.js">
+	</script>
+	<script src="https://apis.google.com/js/client:platform.js" async defer>
+	</script>
+</head>
+<body>
+<div id="signinButton">
+	<span class="g-signin"
+		data scope="open-id"
+		data-clientid="healthy-return-119215"
+		data-redirecturi="postmessage"
+		data-accesstype="offline"
+		data-cookiepolicy="single_host_origin"
+		data-callback="signInCallback"
+		data-approvalprompt="force">
+	</span>
+</div>
+<div id="result"></div>
+
+<script>
+function signInCallback(authResult){
+	if(authResult['code']){
+		$('#signinButton').attr('style','display:none');
+		$.ajax({
+			type:'POST',
+			url:'/gconnect?state={{STATE}}',
+			processData:false,
+			contentType:'application/octet-stream;charset=utf-8'
+			data:authResult['code']
+			success:function(result){
+				if(result){
+					$('#result').html('Login Successful!</br>'+result+'</br>Redirecting...')
+					setTimeout(function(){
+						window.location.href="/restaurant";
+					},4000);
+				}
+				else if (authResult['error']){
+					console.log("there was an error:	"+authResult['error']);
+				}
+				else
+					$('#result').html("failed to make a server side call");
+
+			}
+		});
+	}	
+}
+
+</body>
+</html>
