@@ -1,6 +1,7 @@
 from flask import Flask,render_template,request,redirect,url_for,flash,jsonify
 app=Flask(__name__)
 
+import requests
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from database_setup import Base,Restaurant,MenuItem
@@ -13,17 +14,19 @@ import httplib2
 import json
 from flask import make_response
 
+CLIENT_ID=json.loads(open('client_secrets.json','r').read())['web']['client_id']
+
 
 engine=create_engine('sqlite:///restaurantmenu.db')
 Base.metadata.bind=engine
 DBSession=sessionmaker(bind=engine)
 session=DBSession()
 
-@app.route('/login')
+@app.route('/')
 def showLogin():
 	state=''.join(random.choice(string.ascii_uppercase+string.digits)for x in xrange(32))
 	login_session['state']=state
-	return 	render_template('login.html')
+	return 	render_template('login.html',STATE=state)
 @app.route('/restaurant/<int:restaurant_id>/menu/JSON')
 def restaurantMenuJSON(restaurant_id):
 	restaurant=session.query(Restaurant).filter_by(id=restaurant_id).one()
@@ -34,6 +37,10 @@ def restaurantMenuJSON(restaurant_id):
 def menuItemJSON(restaurant_id,menu_id):
 	item=session.query(MenuItem).filter_by(id=menu_id).one()
 	return jsonify(MenuItems=item.serialize)
+
+@app.route('/restaurant')
+def restaurant():
+	return "hi"
 
 
 @app.route('/')
@@ -81,7 +88,78 @@ def deleteMenuItem(restaurant_id,menu_id):
 	else:
 		return render_template('deletemenuitem.html',i=deleteItem)
 
+@app.route('/gconnect',methods=['POST'])
+def gconnect():
+	if request.args.get('state')!=login_session['state']:
+		print request.args.get('state')
+		print login_session['state']
+		response=make_response(	json.dumps('invalid stae parameter'),401)
+		response.headers['Content-Type']='application/json'
+		return response
 
+	code=request.data
+	try:
+		oauth_flow=flow_from_clientsecrets('client_secrets.json',scope='')
+		oauth_flow.redirect_uri='postmessage'
+		credentials=oauth_flow.step2_exchange(code)
+	except FlowExchangeError:
+		print FlowExchangeError
+		response=make_response(	json.dumps('failed '),401)
+		response.headers['Content-Type']='application/json'
+		return response
+
+	access_token=credentials.access_token
+	url=('https://www.googleapis.com/oauth2/v1/tokeninfo?access_token=%s' % access_token)
+	h=httplib2.Http()
+	result=json.loads(h.request(url,'GET')[1])
+	if result.get('error') is not None:
+		print "bye"
+		response=make_response(json.dumps(result.get('error')),500)
+		response.headers['Content-Type']='application/json'
+
+	gplus_id=credentials.id_token['sub']
+	if result['user_id']!=gplus_id :
+
+		response=make_response(	json.dumps("token's user_id doesn't match given user_id"),401)
+		response.headers['Content-Type']='application/json'
+		return response
+
+	if result['issued_to']!=CLIENT_ID :
+
+		response=make_response(	json.dumps("token's client_id doesn't match given client_id"),401)
+		response.headers['Content-Type']='application/json'
+		return response
+
+	stored_credentials=login_session.get('credentials')
+	stored_gplus_id=login_session.get('gplus_id')
+	if stored_credentials  is not None and gplus_id==stored_gplus_id :
+		response=make_response(	json.dumps("current user is already connected"),200)
+		response.headers['Content-Type']='application/json'
+
+	login_session['access_token']=credentials.access_token
+	
+
+	userinfo_url="https://www.googleapis.com/oauth2/v1/userinfo"
+	params={'access_token':credentials.access_token,'alt':'json'}
+	answer=requests.get(userinfo_url,params=params)
+
+	data=json.loads(answer.text)
+
+	login_session['username']=data['name']
+	login_session['picture']=data['picture']
+
+
+	output=""
+	output+='<h1>Welcome,'
+	output+=login_session['username']
+	output+='!</h1>'
+	output+='<img src="'
+	output+=login_session['picture']
+	output+='"style="width:300px; height:300px;border-radius:150px;-webkit-border-radius:150px;-moz-border-radius:150px;">'
+	flash("you are now logged in as %s"%login_session['username'])
+	print output
+	return output
+	print "hello"
 
 if __name__=='__main__':
 	app.secret_key='p1p13420mentalist'

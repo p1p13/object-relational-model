@@ -9,7 +9,7 @@
 <div id="signinButton">
 	<span class="g-signin"
 		data scope="open-id"
-		data-clientid="healthy-return-119215"
+		data-clientid="401733962222-if41gnocu5aogid0pdquf4phtb2cc7vp.apps.googleusercontent.com"
 		data-redirecturi="postmessage"
 		data-accesstype="offline"
 		data-cookiepolicy="single_host_origin"
@@ -21,15 +21,17 @@
 
 <script>
 function signInCallback(authResult){
+
 	if(authResult['code']){
 		$('#signinButton').attr('style','display:none');
 		$.ajax({
 			type:'POST',
 			url:'/gconnect?state={{STATE}}',
 			processData:false,
-			contentType:'application/octet-stream;charset=utf-8'
-			data:authResult['code']
+			contentType:'application/octet-stream;charset=utf-8',
+			data:authResult['code'],
 			success:function(result){
+				alert("uo");
 				if(result){
 					$('#result').html('Login Successful!</br>'+result+'</br>Redirecting...')
 					setTimeout(function(){
@@ -39,13 +41,19 @@ function signInCallback(authResult){
 				else if (authResult['error']){
 					console.log("there was an error:	"+authResult['error']);
 				}
-				else
+				else{
 					$('#result').html("failed to make a server side call");
+				}
 
 			}
 		});
-	}	
+	}
+	else
+		alert("nope");
+	
+	
 }
+</script>
 
 </body>
 </html>
