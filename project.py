@@ -12,6 +12,8 @@ from oauth2client.client import flow_from_clientsecrets
 from oauth2client.client import FlowExchangeError
 import httplib2
 import json
+import urllib2
+import urllib
 from flask import make_response
 
 CLIENT_ID=json.loads(open('client_secrets.json','r').read())['web']['client_id']
@@ -130,9 +132,9 @@ def gconnect():
 		response.headers['Content-Type']='application/json'
 		return response
 
-	stored_credentials=login_session.get('credentials')
+	stored_access_token=login_session.get('access_token')
 	stored_gplus_id=login_session.get('gplus_id')
-	if stored_credentials  is not None and gplus_id==stored_gplus_id :
+	if stored_access_token  is not None and gplus_id==stored_gplus_id :
 		response=make_response(	json.dumps("current user is already connected"),200)
 		response.headers['Content-Type']='application/json'
 
@@ -158,8 +160,35 @@ def gconnect():
 	output+='"style="width:300px; height:300px;border-radius:150px;-webkit-border-radius:150px;-moz-border-radius:150px;">'
 	flash("you are now logged in as %s"%login_session['username'])
 	print output
+	print login_session['access_token']
 	return output
 	print "hello"
+
+@app.route("/gdisconnect")
+def gdisconnect():
+	access_token=login_session['access_token']
+	if access_token is None:
+		response=make_response(json.dumps('current user not connected'),401)
+		response.headers['Content-Type']='application/json'
+		return response
+	print access_token
+	url="https://accounts.google.com/o/oauth2/revoke?token=%s"%access_token
+	
+	h = httplib2.Http()
+	result = h.request(url, 'GET')[0]
+	if result['status']=='200':
+		print "yo"
+		del login_session['access_token']
+		del login_session['username']
+		del login_session['picture']
+		response=make_response(json.dumps('Successfully disconnected'),200)
+		response.headers['Content-Type']='application/json'
+		return response
+	else:
+		print result
+		response=make_response(json.dumps('failed to revoke token'),400)
+		response.headers['Content-Type']='application/json'
+		return response
 
 if __name__=='__main__':
 	app.secret_key='p1p13420mentalist'
